@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>QR Code Generator</title>
+  <style>
+    :root {
+      --bg: #f7fafc;
+      --card: #ffffff;
+      --text: #111827;
+      --muted: #6b7280;
+      --primary: #111827;
+      --accent: #059669;
+    }
+    html,body { height:100%; margin:0; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background: var(--bg);
+      color: var(--text);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:20px;
+    }
+    .card {
+      background:var(--card);
+      padding:22px;
+      border-radius:12px;
+      box-shadow:0 6px 20px rgba(2,6,23,0.08);
+      width:420px;
+      max-width:100%;
+      box-sizing:border-box;
+    }
+    h1 { font-size:18px; margin:0 0 6px 0; }
+    p.lead { margin:0 0 14px 0; color:var(--muted); font-size:14px; }
+    label { display:block; font-size:13px; margin-bottom:6px; color:var(--text); }
+    input[type="url"] {
+      width:100%;
+      padding:10px 12px;
+      border-radius:8px;
+      border:1px solid #e5e7eb;
+      font-size:14px;
+      box-sizing:border-box;
+    }
+    .controls { display:flex; gap:8px; margin-top:12px; }
+    button {
+      padding:10px 12px;
+      border-radius:8px;
+      border:0;
+      background:var(--primary);
+      color:white;
+      cursor:pointer;
+      font-weight:600;
+      flex:1;
+    }
+    button.secondary {
+      background:#eef2ff;
+      color:#3730a3;
+      border:0;
+      font-weight:600;
+    }
+    #qr-wrap { display:flex; justify-content:center; margin-top:18px; min-height:320px; align-items:center; }
+    canvas { border-radius:8px; background:white; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+    .hint { font-size:13px; color:var(--muted); margin-top:10px; text-align:center; }
+    .download-row { display:flex; justify-content:center; margin-top:12px; gap:8px; }
+    .btn-small {
+      padding:8px 10px;
+      border-radius:8px;
+      border:0;
+      cursor:pointer;
+      font-weight:600;
+    }
+    .btn-download { background:var(--accent); color:#fff; }
+    .btn-hide { background:#f3f4f6; color:#111827; }
+    .note { font-size:12px; color:#374151; text-align:center; margin-top:8px; }
+  </style>
+</head>
+<body>
+  <main class="card" role="main">
+    <h1>QR Code Generator</h1>
+    <p class="lead">Enter a link (include https://) and click Generate. The QR code will appear and you can download it as a PNG.</p>
+
+    <label for="url-input">Link (include protocol)</label>
+    <input id="url-input" type="url" placeholder="https://example.com" aria-label="URL to encode" />
+
+    <div class="controls">
+      <button id="generate">Generate</button>
+      <button id="clear" class="secondary">Clear</button>
+    </div>
+
+    <div id="qr-wrap">
+      <canvas id="qr" width="300" height="300" style="display:none"></canvas>
+    </div>
+
+    <div class="download-row">
+      <a id="download-link" style="display:none" download="qrcode.png" href="#">
+        <button id="download" class="btn-small btn-download" type="button">Download PNG</button>
+      </a>
+      <button id="copy-link" class="btn-small btn-hide" type="button" style="display:none">Copy Data URL</button>
+    </div>
+
+    <p class="hint">Tip: Shorter links generally produce slightly cleaner QR patterns for small sizes.</p>
+    <p class="note">This page uses the QRious library via CDN to render the QR to a canvas.</p>
+
+    <!-- QRious (tiny QR renderer) -->
+    <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
+    <script>
+      const input = document.getElementById('url-input');
+      const generateBtn = document.getElementById('generate');
+      const clearBtn = document.getElementById('clear');
+      const downloadLink = document.getElementById('download-link');
+      const downloadBtn = document.getElementById('download');
+      const copyBtn = document.getElementById('copy-link');
+      const qrCanvas = document.getElementById('qr');
+
+      const qr = new QRious({
+        element: qrCanvas,
+        size: 300,
+        value: ''
+      });
+
+      function isValidUrl(value) {
+        try {
+          const u = new URL(value);
+          return u.protocol === 'http:' || u.protocol === 'https:';
+        } catch (e) {
+          return false;
+        }
+      }
+
+      function generate() {
+        const val = input.value.trim();
+        if (!val) {
+          alert('Please enter a URL to encode.');
+          input.focus();
+          return;
+        }
+        if (!isValidUrl(val)) {
+          alert('Please enter a valid URL (include http:// or https://).');
+          input.focus();
+          return;
+        }
+
+        qr.value = val; // QRious renders to the canvas element
+        qrCanvas.style.display = 'block';
+
+        // Build the data URL for download
+        try {
+          const dataUrl = qrCanvas.toDataURL('image/png');
+          downloadLink.href = dataUrl;
+          downloadLink.style.display = 'inline-block';
+          copyBtn.style.display = 'inline-block';
+        } catch (e) {
+          console.error('Failed to create data URL:', e);
+          downloadLink.style.display = 'none';
+          copyBtn.style.display = 'none';
+        }
+      }
+
+      generateBtn.addEventListener('click', generate);
+
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') generate();
+      });
+
+      clearBtn.addEventListener('click', () => {
+        input.value = '';
+        qrCanvas.style.display = 'none';
+        downloadLink.style.display = 'none';
+        copyBtn.style.display = 'none';
+        // clear canvas (visual)
+        const ctx = qrCanvas.getContext('2d');
+        ctx && ctx.clearRect(0, 0, qrCanvas.width, qrCanvas.height);
+      });
+
+      copyBtn.addEventListener('click', async () => {
+        try {
+          const dataUrl = qrCanvas.toDataURL('image/png');
+          await navigator.clipboard.writeText(dataUrl);
+          copyBtn.innerText = 'Copied!';
+          setTimeout(() => copyBtn.innerText = 'Copy Data URL', 1400);
+        } catch (err) {
+          console.error('Clipboard write failed', err);
+          alert('Unable to copy to clipboard.');
+        }
+      });
+
+      // Small usability improvement: when the image is clicked, open it in a new tab
+      qrCanvas.addEventListener('click', () => {
+        try {
+          const dataUrl = qrCanvas.toDataURL('image/png');
+          window.open(dataUrl, '_blank');
+        } catch (e) { /* ignore */ }
+      });
+    </script>
+  </main>
+</body>
+</html>
